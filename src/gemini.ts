@@ -61,18 +61,15 @@ Return ONLY a valid JSON object with no markdown, no explanation, exactly this s
 
 Provide exactly 7 days, 5-7 snack swaps, exactly 5 rules tailored to the user's profile, and 3-5 supplements.`
 
-  const res = await fetch(`${GATEWAY}/v1/models/gemini-1.5-flash:generateContent`, {
+  const res = await fetch(`${GATEWAY}/gemini/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-    }),
+    body: JSON.stringify({ prompt }),
   })
 
   if (!res.ok) throw new Error(`Gateway error: ${res.status}`)
 
   const data = await res.json()
-  const text = data.candidates[0].content.parts[0].text
+  const text = typeof data === 'string' ? data : (data.text ?? data.response ?? data.content ?? JSON.stringify(data))
   return JSON.parse(text) as GeminiPlan
 }
