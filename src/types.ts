@@ -39,6 +39,42 @@ export interface FormData {
   snacks: SnackData
 }
 
+export interface GeminiMeal {
+  type: string
+  name: string
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  note?: string
+}
+
+export interface GeminiDay {
+  day: string
+  theme: string
+  meals: GeminiMeal[]
+}
+
+export interface GeminiSnackSwap {
+  original: string
+  swap: string
+  calories: string
+}
+
+export interface GeminiSupplement {
+  name: string
+  dose: string
+  timing: string
+  note: string
+}
+
+export interface GeminiPlan {
+  mealPlan: GeminiDay[]
+  snackSwaps: GeminiSnackSwap[]
+  rules: string[]
+  supplements: GeminiSupplement[]
+}
+
 export interface NutritionPlan {
   bmr: number
   tdee: number

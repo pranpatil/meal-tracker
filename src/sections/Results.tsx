@@ -1,8 +1,11 @@
-import type { FormData, NutritionPlan } from '../types'
+import type { FormData, NutritionPlan, GeminiPlan } from '../types'
 
 interface Props {
   formData: FormData
   plan: NutritionPlan
+  geminiPlan: GeminiPlan | null
+  geminiLoading: boolean
+  geminiError: boolean
   onRestart: () => void
 }
 
@@ -227,11 +230,13 @@ function getPersonalRules(formData: FormData, plan: NutritionPlan): string[] {
   return rules.slice(0, 5)
 }
 
-export default function Results({ formData, plan, onRestart }: Props) {
+export default function Results({ formData, plan, geminiPlan, geminiLoading, geminiError, onRestart }: Props) {
   const { stats, lifestyle } = formData
-  const days = getMealPlanDays(formData, plan)
-  const snackSwaps = getSnackSwaps(formData)
-  const rules = getPersonalRules(formData, plan)
+
+  // Fall back to static generators if Gemini hasn't loaded yet
+  const days = geminiPlan ? null : getMealPlanDays(formData, plan)
+  const snackSwaps = geminiPlan ? null : getSnackSwaps(formData)
+  const rules = geminiPlan ? null : getPersonalRules(formData, plan)
 
   const weightToLoseKg = parseFloat(stats.weightKg) - parseFloat(stats.goalWeight)
   const months = plan.weeksToGoal ? Math.round(plan.weeksToGoal / 4.3) : null
@@ -290,36 +295,49 @@ export default function Results({ formData, plan, onRestart }: Props) {
       </Section>
 
       {/* 7-Day Meal Plan */}
-      <Section emoji="📅" title="Your 7-Day Meal Plan">
-        <p className="text-xs text-gray-500">Built around your favourites. 📦 = great for batch cooking.</p>
+      <Section emoji="📅" title="7-Day Meal Plan">
+        {geminiLoading && (
+          <div className="flex items-center gap-2 text-sm text-emerald-600 py-4 justify-center">
+            <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+            Generating your personalised plan with Gemini…
+          </div>
+        )}
+        {geminiError && <p className="text-xs text-amber-600">Could not reach Gemini — showing a default plan instead.</p>}
         <div className="space-y-4">
-          {days.map(day => (
+          {(geminiPlan ? geminiPlan.mealPlan : days ?? []).map(day => (
             <div key={day.day} className="border border-gray-100 rounded-xl overflow-hidden">
               <div className="bg-emerald-600 text-white px-4 py-2 flex items-center gap-2">
-                <span>{day.emoji}</span>
+                {'emoji' in day && <span>{(day as { emoji: string }).emoji}</span>}
                 <span className="font-semibold text-sm">{day.day}: {day.theme}</span>
               </div>
               <div className="divide-y divide-gray-50">
-                {day.meals.map((meal, i) => (
-                  <div key={i} className="px-4 py-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide mr-1.5">
-                          {i === 0 ? 'Breakfast' : i === 1 ? 'Lunch' : i === 2 ? 'Dinner' : 'Dessert'}
-                        </span>
-                        <span className="text-sm text-gray-800">{meal.name}</span>
-                        {meal.note && <p className="text-xs text-amber-600 mt-0.5">{meal.note}</p>}
-                      </div>
-                      <div className="text-right flex-none">
-                        <p className="text-sm font-bold text-gray-800">{meal.cals} kcal</p>
-                        <p className="text-xs text-gray-400">P:{meal.p}g C:{meal.c}g F:{meal.f}g</p>
+                {day.meals.map((meal, i) => {
+                  const name = 'name' in meal ? meal.name : ''
+                  const cals = 'cals' in meal ? (meal as { cals: number }).cals : (meal as { calories: number }).calories
+                  const p = 'p' in meal ? (meal as { p: number }).p : (meal as { protein: number }).protein
+                  const c = 'c' in meal ? (meal as { c: number }).c : (meal as { carbs: number }).carbs
+                  const f = 'f' in meal ? (meal as { f: number }).f : (meal as { fat: number }).fat
+                  const note = meal.note
+                  const mealType = 'type' in meal ? (meal as { type: string }).type : (i === 0 ? 'Breakfast' : i === 1 ? 'Lunch' : i === 2 ? 'Dinner' : 'Snack')
+                  return (
+                    <div key={i} className="px-4 py-2.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <span className="text-xs font-medium text-emerald-600 uppercase tracking-wide mr-1.5">{mealType}</span>
+                          <span className="text-sm text-gray-800">{name}</span>
+                          {note && <p className="text-xs text-amber-600 mt-0.5">{note}</p>}
+                        </div>
+                        <div className="text-right flex-none">
+                          <p className="text-sm font-bold text-gray-800">{cals} kcal</p>
+                          <p className="text-xs text-gray-400">P:{p}g C:{c}g F:{f}g</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 <div className="px-4 py-2 bg-gray-50 flex justify-between text-xs font-medium text-gray-600">
                   <span>Daily total</span>
-                  <span>≈ {day.meals.reduce((s, m) => s + m.cals, 0)} kcal · P:{day.meals.reduce((s, m) => s + m.p, 0)}g C:{day.meals.reduce((s, m) => s + m.c, 0)}g F:{day.meals.reduce((s, m) => s + m.f, 0)}g</span>
+                  <span>≈ {day.meals.reduce((s, m) => s + ('cals' in m ? (m as { cals: number }).cals : (m as { calories: number }).calories), 0)} kcal</span>
                 </div>
               </div>
             </div>
@@ -329,112 +347,58 @@ export default function Results({ formData, plan, onRestart }: Props) {
 
       {/* Snack Swaps */}
       <Section emoji="🔄" title="Snack Swaps">
-        <p className="text-xs text-gray-500">Same itch, fewer calories. Every swap listed is something you'll actually want to eat.</p>
         <div className="space-y-3 bg-gray-50 rounded-xl p-4">
-          {snackSwaps.map((swap, i) => (
+          {(geminiPlan ? geminiPlan.snackSwaps : snackSwaps ?? []).map((swap, i) => (
             <SnackSwap key={i} original={swap.original} swap={swap.swap} calories={swap.calories} />
           ))}
         </div>
       </Section>
 
       {/* Personal Rules */}
-      <Section emoji="📌" title="Your 5 Personal Fat Loss Rules">
-        <p className="text-xs text-gray-500">Written specifically for you — not generic advice.</p>
+      <Section emoji="📌" title="5 Personal Rules">
         <div className="space-y-3">
-          {rules.map((rule, i) => (
+          {(geminiPlan ? geminiPlan.rules : rules ?? []).map((rule, i) => (
             <Rule key={i} number={i + 1} text={rule} />
           ))}
         </div>
       </Section>
 
       {/* Timeline */}
-      <Section emoji="📈" title="Realistic Timeline">
+      <Section emoji="📈" title="Timeline">
         <div className="grid grid-cols-2 gap-3">
           <StatCard label="Weekly fat loss" value={`~${plan.weeklyLoss}kg`} color="emerald" />
           <StatCard label="Estimated goal" value={months ? `~${months} months` : 'Already there!'} color="teal" />
         </div>
-        {weightToLoseKg > 0 && plan.weeksToGoal && (
-          <div className="text-sm text-gray-600 space-y-2 mt-1">
-            <p>📅 <strong>Month 1–2:</strong> Expect 1–2kg gone, energy improving, clothes fitting differently. The scale moves slow at first — don't panic. Water weight fluctuates.</p>
-            <p>📅 <strong>Month 3–4:</strong> Results really start showing. If you've been consistent, you could be 4–6kg lighter and feeling significantly better in the gym.</p>
-            {months && months > 4 && <p>📅 <strong>Month 5+:</strong> The long game — the people who get here are those who built habits, not willpower. By now your new eating pattern is just... how you eat.</p>}
-            <p className="text-xs text-gray-400 pt-1">⚡ These projections assume consistent adherence. Real fat loss is non-linear — some weeks will be faster, some slower. Trust the process.</p>
-          </div>
+        {weightToLoseKg > 0 && (
+          <p className="text-xs text-gray-400 pt-1">Fat loss is non-linear — some weeks faster, some slower. Projections assume consistent adherence.</p>
         )}
       </Section>
 
       {/* Hydration */}
-      <Section emoji="💧" title="Daily Hydration Target">
+      <Section emoji="💧" title="Daily Hydration">
         <StatCard label="Daily water target" value={plan.waterLitres} unit="litres" color="blue" />
-        <div className="text-sm text-gray-600 space-y-2 mt-1">
-          <p>🔬 <strong>Why it matters:</strong> Being even mildly dehydrated tanks gym performance by up to 20%, triggers false hunger signals (thirst often masquerades as hunger), slows metabolism, and kills energy. Hydration isn't an afterthought — it's a fat loss tool.</p>
-          <div className="space-y-1.5">
-            <p>✅ <strong>Tip 1:</strong> {lifestyle.jobType === 'manual' || lifestyle.jobType === 'feet' ? 'Keep a 1L bottle at your workstation/locker and refill it twice during your shift.' : 'Keep a 1L bottle on your desk and aim to empty it twice before 5pm.'}</p>
-            <p>✅ <strong>Tip 2:</strong> Drink 500ml of water first thing in the morning before coffee or food — your body is dehydrated after sleep.</p>
-            <p>✅ <strong>Tip 3:</strong> Have a full glass of water 20–30 minutes before each meal. Studies show this reduces calorie intake by up to 13% at that meal.</p>
-            <p>✅ <strong>Tip 4:</strong> If you're exercising, drink an extra 500ml during your session and 250ml for every 30 minutes of training.</p>
-          </div>
+        <div className="text-sm text-gray-600 space-y-1.5 mt-1">
+          <p>✅ {lifestyle.jobType === 'manual' || lifestyle.jobType === 'feet' ? 'Keep a 1L bottle at your workstation and refill it twice per shift.' : 'Keep a 1L bottle on your desk and empty it twice before 5pm.'}</p>
+          <p>✅ Drink 500ml first thing in the morning before coffee.</p>
+          <p>✅ A full glass 20–30 minutes before each meal reduces hunger.</p>
         </div>
       </Section>
 
       {/* Supplements */}
-      <Section emoji="💊" title="Supplement Recommendations">
+      <Section emoji="💊" title="Supplements">
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
-          🔑 Supplements are the <strong>1%</strong>. Food, training, sleep and consistency are the <strong>99%</strong>. Don't let this section distract you from the basics.
+          Supplements are secondary. Consistent food, training, and sleep come first.
         </div>
         <div className="space-y-3">
-          {[
-            {
-              name: 'Creatine Monohydrate',
-              emoji: '💪',
-              dose: '3–5g daily',
-              timing: 'Any time, consistent daily use',
-              why: 'The most researched supplement in existence. Improves strength, power output, muscle retention during a cut, and even cognitive function. Non-negotiable if you\'re training.',
-              product: 'MyProtein Creatine Monohydrate — £10–15 for 250 servings. Hard to beat.',
-            },
-            {
-              name: 'Vitamin D3',
-              emoji: '☀️',
-              dose: '2,000–4,000 IU daily',
-              timing: 'With a meal containing fat',
-              why: 'Most people in the UK and northern climates are deficient, especially in winter. Low D3 is linked to fatigue, low mood, and impaired fat metabolism — all things that will undermine your results.',
-              product: 'BetterYou D3+K2 Oral Spray (£8–12) — excellent bioavailability, no pills needed.',
-            },
-            ...(parseInt(lifestyle.exercisePerWeek) >= 3 ? [{
-              name: 'Omega-3 Fish Oil',
-              emoji: '🐟',
-              dose: '2–3g EPA/DHA daily',
-              timing: 'With meals',
-              why: 'Reduces exercise-induced inflammation, supports joint health and recovery, and may improve body composition by slightly enhancing fat oxidation. Especially relevant for your training volume.',
-              product: 'Wiley\'s Finest Wild Alaskan Fish Oil or any capsule with 1000mg+ EPA/DHA per serving (£10–15/month).',
-            }] : []),
-            ...(parseInt(lifestyle.sleepHours) < 7 ? [{
-              name: 'Magnesium Glycinate',
-              emoji: '🌙',
-              dose: '200–400mg elemental magnesium',
-              timing: '30–60 mins before bed',
-              why: `You mentioned averaging ~${lifestyle.sleepHours} hours of sleep. Magnesium glycinate promotes deeper sleep quality, reduces cortisol at night, and helps with muscle recovery. This isn't just a nice-to-have at your sleep level.`,
-              product: 'Bulk Magnesium Bisglycinate (£10–15) — glycinate form is the most bioavailable and gentlest on digestion.',
-            }] : []),
-            {
-              name: 'Whey Protein',
-              emoji: '🥛',
-              dose: '1–2 scoops (~25–50g protein)',
-              timing: 'Post-workout or whenever you\'re behind on protein',
-              why: `Your target is ${plan.protein}g protein daily. If you're consistently hitting it through food, skip this. But on busy days or post-gym when you need a quick hit, whey is the most efficient and cost-effective protein source.`,
-              product: 'MyProtein Impact Whey or Bulk Pure Whey Protein — both £20–30 for a month\'s supply.',
-            },
-          ].map(sup => (
-            <div key={sup.name} className="border border-gray-100 rounded-xl p-4 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{sup.emoji}</span>
-                <div>
-                  <p className="font-semibold text-gray-900 text-sm">{sup.name}</p>
-                  <p className="text-xs text-emerald-600">{sup.dose} · {sup.timing}</p>
-                </div>
-              </div>
-              <p className="text-xs text-gray-600">{sup.why}</p>
-              <p className="text-xs text-gray-400">💡 <em>{sup.product}</em></p>
+          {(geminiPlan ? geminiPlan.supplements : [
+            { name: 'Creatine Monohydrate', dose: '3–5g daily', timing: 'Any time', note: 'Improves strength and helps preserve muscle during a deficit.' },
+            { name: 'Vitamin D3', dose: '2,000–4,000 IU daily', timing: 'With a meal containing fat', note: 'Commonly deficient. Supports energy and metabolism.' },
+            { name: 'Whey Protein', dose: '25–50g protein', timing: 'Post-workout or when behind on protein', note: `Useful if you're consistently short of your ${plan.protein}g target.` },
+          ]).map(sup => (
+            <div key={sup.name} className="border border-gray-100 rounded-xl p-4 space-y-1">
+              <p className="font-semibold text-gray-900 text-sm">{sup.name}</p>
+              <p className="text-xs text-emerald-600">{sup.dose} · {sup.timing}</p>
+              <p className="text-xs text-gray-500">{sup.note}</p>
             </div>
           ))}
         </div>

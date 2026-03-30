@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { FormData, StatsData, LifestyleData, FoodData, SnackData } from './types'
+import type { FormData, StatsData, LifestyleData, FoodData, SnackData, GeminiPlan } from './types'
 import { calculatePlan } from './calculations'
+import { generatePlan } from './gemini'
 import StatsSection from './sections/StatsSection'
 import LifestyleSection from './sections/LifestyleSection'
 import FoodSection from './sections/FoodSection'
@@ -26,9 +27,24 @@ export default function App() {
   const [lifestyle, setLifestyle] = useState<LifestyleData>(defaultLifestyle)
   const [food, setFood] = useState<FoodData>(defaultFood)
   const [snacks, setSnacks] = useState<SnackData>(defaultSnacks)
+  const [geminiPlan, setGeminiPlan] = useState<GeminiPlan | null>(null)
+  const [geminiLoading, setGeminiLoading] = useState(false)
+  const [geminiError, setGeminiError] = useState(false)
 
   const formData: FormData = { stats, lifestyle, food, snacks }
   const plan = step === 5 ? calculatePlan(formData) : null
+
+  const goToResults = () => {
+    const calculated = calculatePlan({ stats, lifestyle, food, snacks })
+    setStep(5)
+    setGeminiPlan(null)
+    setGeminiError(false)
+    setGeminiLoading(true)
+    generatePlan({ stats, lifestyle, food, snacks }, calculated)
+      .then(setGeminiPlan)
+      .catch(() => setGeminiError(true))
+      .finally(() => setGeminiLoading(false))
+  }
 
   const restart = () => {
     setStep(1)
@@ -36,6 +52,8 @@ export default function App() {
     setLifestyle(defaultLifestyle)
     setFood(defaultFood)
     setSnacks(defaultSnacks)
+    setGeminiPlan(null)
+    setGeminiError(false)
   }
 
   return (
@@ -104,10 +122,10 @@ export default function App() {
           <FoodSection data={food} onChange={setFood} onNext={() => setStep(4)} onBack={() => setStep(2)} />
         )}
         {step === 4 && (
-          <SnacksSection data={snacks} onChange={setSnacks} onNext={() => setStep(5)} onBack={() => setStep(3)} />
+          <SnacksSection data={snacks} onChange={setSnacks} onNext={goToResults} onBack={() => setStep(3)} />
         )}
         {step === 5 && plan && (
-          <Results formData={formData} plan={plan} onRestart={restart} />
+          <Results formData={formData} plan={plan} geminiPlan={geminiPlan} geminiLoading={geminiLoading} geminiError={geminiError} onRestart={restart} />
         )}
       </main>
     </div>
