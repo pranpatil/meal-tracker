@@ -61,7 +61,7 @@ Return ONLY a valid JSON object with no markdown, no explanation, exactly this s
 
 Provide exactly 7 days, 5-7 snack swaps, exactly 5 rules tailored to the user's profile, and 3-5 supplements.`
 
-  const res = await fetch(`${GATEWAY}/gemini/generate`, {
+  const res = await fetch(`${GATEWAY}/api/gemini/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt }),
