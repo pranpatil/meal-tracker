@@ -40,3 +40,11 @@
 .chat-scroll::-webkit-scrollbar { width: 6px; }
 .chat-scroll::-webkit-scrollbar-track { background: transparent; }
 .chat-scroll::-webkit-scrollbar-thumb { background: #a7f3d0; border-radius: 3px; }
+
+@media print {
+  header, .no-print { display: none !important; }
+  body { background: white !important; }
+  main { max-width: 100% !important; padding: 0 !important; }
+  .shadow-sm { box-shadow: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

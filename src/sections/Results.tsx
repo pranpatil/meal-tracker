@@ -441,18 +441,16 @@ export default function Results({ formData, plan, onRestart }: Props) {
       </Section>
 
       {/* CTA */}
-      <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-2xl p-6 text-white text-center space-y-3">
-        <p className="text-2xl">🚀</p>
-        <h3 className="font-bold text-lg">You've got everything you need.</h3>
-        <p className="text-emerald-100 text-sm">
-          The plan is personalised, the maths is done, and the meals are ones you'll actually enjoy. All that's left is to start.
-        </p>
-        <p className="text-emerald-200 text-xs">
-          Save or print this page, or tap below to start over with new details.
-        </p>
+      <div className="no-print flex gap-3 justify-center pb-4">
+        <button
+          onClick={() => window.print()}
+          className="bg-emerald-600 text-white font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-emerald-700 transition-colors"
+        >
+          Export as PDF
+        </button>
         <button
           onClick={onRestart}
-          className="mt-2 bg-white text-emerald-700 font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-emerald-50 transition-colors"
+          className="bg-white border border-emerald-200 text-emerald-700 font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-emerald-50 transition-colors"
         >
           Start Over
         </button>
